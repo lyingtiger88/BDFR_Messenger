@@ -16,6 +16,8 @@ public sealed class TokenService(string issuer, string audience, string signingK
 
         var claims = new[]
         {
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+            new Claim(ClaimTypes.Name, username),
             new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new Claim(JwtRegisteredClaimNames.UniqueName, username),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
