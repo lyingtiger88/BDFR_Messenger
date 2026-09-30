@@ -2,6 +2,7 @@ using System.Security.Claims;
 using BDFR.Database;
 using BDFR.Database.Models;
 using BDFR.Gateway.Realtime;
+using BDFR.Security.Cryptography;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -14,7 +15,11 @@ public sealed record SendMessageRequest(string Content);
 [ApiController]
 [Authorize]
 [Route("api/messages")]
-public sealed class MessagesController(MessengerDbContext db, IHubContext<ChatHub> hub) : ControllerBase
+public sealed class MessagesController(
+    MessengerDbContext db,
+    IHubContext<ChatHub> hub,
+    AesGcmDataProtector protector,
+    IConfiguration configuration) : ControllerBase
 {
     [HttpPost("to/{recipientId:guid}")]
     public async Task<IActionResult> Send(Guid recipientId, SendMessageRequest request, CancellationToken ct)
@@ -32,7 +37,7 @@ public sealed class MessagesController(MessengerDbContext db, IHubContext<ChatHu
         {
             SenderId = senderId,
             RecipientId = recipientId,
-            Content = content
+            ContentEncrypted = protector.Encrypt(content, GetDataKey())
         };
 
         db.Messages.Add(message);
@@ -43,7 +48,7 @@ public sealed class MessagesController(MessengerDbContext db, IHubContext<ChatHu
             message.Id,
             message.SenderId,
             message.RecipientId,
-            message.Content,
+            Content = content,
             message.CreatedAt
         };
 
@@ -57,24 +62,26 @@ public sealed class MessagesController(MessengerDbContext db, IHubContext<ChatHu
         var me = CurrentUserId();
         take = Math.Clamp(take, 1, 100);
 
-        var messages = await db.Messages
+        var rows = await db.Messages
             .Where(x =>
                 (x.SenderId == me && x.RecipientId == otherUserId) ||
                 (x.SenderId == otherUserId && x.RecipientId == me))
             .OrderByDescending(x => x.CreatedAt)
             .Take(take)
             .OrderBy(x => x.CreatedAt)
-            .Select(x => new
-            {
-                x.Id,
-                x.SenderId,
-                x.RecipientId,
-                x.Content,
-                x.CreatedAt,
-                x.DeliveredAt,
-                x.ReadAt
-            })
             .ToListAsync(ct);
+
+        var key = GetDataKey();
+        var messages = rows.Select(x => new
+        {
+            x.Id,
+            x.SenderId,
+            x.RecipientId,
+            Content = protector.Decrypt(x.ContentEncrypted, key),
+            x.CreatedAt,
+            x.DeliveredAt,
+            x.ReadAt
+        });
 
         return Ok(messages);
     }
@@ -90,6 +97,15 @@ public sealed class MessagesController(MessengerDbContext db, IHubContext<ChatHu
         message.ReadAt ??= DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
         return NoContent();
+    }
+
+    private byte[] GetDataKey()
+    {
+        var encoded = configuration["Security:DataEncryptionKeyBase64"]
+            ?? throw new InvalidOperationException("Data encryption key is missing.");
+        var key = Convert.FromBase64String(encoded);
+        if (key.Length != 32) throw new InvalidOperationException("Data encryption key must be 32 bytes.");
+        return key;
     }
 
     private Guid CurrentUserId()
