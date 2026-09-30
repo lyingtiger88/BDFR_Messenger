@@ -31,7 +31,7 @@ public sealed class MessengerDbContext(DbContextOptions<MessengerDbContext> opti
 
         var message = modelBuilder.Entity<Message>();
         message.HasKey(x => x.Id);
-        message.Property(x => x.Content).HasMaxLength(4000).IsRequired();
+        message.Property(x => x.ContentEncrypted).IsRequired();
         message.HasIndex(x => new { x.SenderId, x.RecipientId, x.CreatedAt });
         message.HasIndex(x => new { x.RecipientId, x.ReadAt });
     }
