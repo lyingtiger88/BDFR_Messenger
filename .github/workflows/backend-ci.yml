@@ -7,18 +7,14 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-      - name: Restore and build Gateway
+      - name: Build Gateway
         run: dotnet build Backend/BDFR.Gateway/BDFR.Gateway.csproj -c Release
-      - name: Restore and build Auth
-        run: dotnet build Backend/BDFR.Auth/BDFR.Auth.csproj -c Release
-      - name: Restore and build Security
-        run: dotnet build Backend/BDFR.Security/BDFR.Security.csproj -c Release
-      - name: Restore and build Database
-        run: dotnet build Backend/BDFR.Database/BDFR.Database.csproj -c Release
+      - name: Run tests
+        run: dotnet test Backend/BDFR.Tests/BDFR.Tests.csproj -c Release --no-restore=false
