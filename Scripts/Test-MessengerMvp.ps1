@@ -10,10 +10,11 @@ function Post-Json($url, $body, $token = $null) {
 }
 
 Write-Host "Starting BDFR Messenger backend..."
-$composeOutput = docker compose -f "$compose" up --build -d 2>&1
-$composeOutput | ForEach-Object { Write-Host $_ }
+$composeOutput = @()
+docker compose -f "$compose" up --build -d 2>&1 | Tee-Object -Variable composeOutput
+$composeExitCode = $LASTEXITCODE
 
-if ($LASTEXITCODE -ne 0) {
+if ($composeExitCode -ne 0) {
     $joined = ($composeOutput | Out-String)
 
     if ($joined -match "read-only file system") {
