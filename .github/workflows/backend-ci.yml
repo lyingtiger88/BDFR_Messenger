@@ -17,4 +17,6 @@ jobs:
       - name: Build Gateway
         run: dotnet build Backend/BDFR.Gateway/BDFR.Gateway.csproj -c Release
       - name: Run tests
-        run: dotnet test Backend/BDFR.Tests/BDFR.Tests.csproj -c Release --no-restore=false
+        run: dotnet test Backend/BDFR.Tests/BDFR.Tests.csproj -c Release
+      - name: Validate Docker build
+        run: docker build -f Backend/BDFR.Gateway/Dockerfile .
