@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using BDFR.Database;
 using BDFR.Database.Models;
+using BDFR.Security.Cryptography;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +9,10 @@ using Microsoft.EntityFrameworkCore;
 namespace BDFR.Gateway.Realtime;
 
 [Authorize]
-public sealed class ChatHub(MessengerDbContext db) : Hub
+public sealed class ChatHub(
+    MessengerDbContext db,
+    AesGcmDataProtector protector,
+    IConfiguration configuration) : Hub
 {
     public async Task SendDirectMessage(Guid recipientId, string content)
     {
@@ -25,7 +29,7 @@ public sealed class ChatHub(MessengerDbContext db) : Hub
         {
             SenderId = senderId,
             RecipientId = recipientId,
-            Content = content
+            ContentEncrypted = protector.Encrypt(content, GetDataKey())
         };
 
         db.Messages.Add(message);
@@ -36,7 +40,7 @@ public sealed class ChatHub(MessengerDbContext db) : Hub
             message.Id,
             message.SenderId,
             message.RecipientId,
-            message.Content,
+            Content = content,
             message.CreatedAt
         };
 
@@ -48,6 +52,15 @@ public sealed class ChatHub(MessengerDbContext db) : Hub
     {
         await Clients.User(recipientId.ToString())
             .SendAsync("typing", new { userId = CurrentUserId(), isTyping });
+    }
+
+    private byte[] GetDataKey()
+    {
+        var encoded = configuration["Security:DataEncryptionKeyBase64"]
+            ?? throw new HubException("Data encryption key is missing.");
+        var key = Convert.FromBase64String(encoded);
+        if (key.Length != 32) throw new HubException("Data encryption key is invalid.");
+        return key;
     }
 
     private Guid CurrentUserId()
