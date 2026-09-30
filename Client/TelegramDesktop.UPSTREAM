@@ -1,0 +1,4 @@
+repository=https://github.com/telegramdesktop/tdesktop.git
+branch=dev
+commit=0b4a7faa9d99ba24ab4f3624cd3d7a5d38cc1ef8
+purpose=BDFR Messenger desktop client foundation
