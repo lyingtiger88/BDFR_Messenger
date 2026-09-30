@@ -10,6 +10,7 @@ if not "%DOCKER_EXIT%"=="0" (
   echo.
   echo Docker Compose failed with exit code %DOCKER_EXIT%.
   echo Review the Docker output above.
+  echo.
   pause
   exit /b %DOCKER_EXIT%
 )
@@ -20,10 +21,18 @@ echo Running API smoke test...
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Test-MessengerMvp.ps1" -SkipDockerStart
 set "EXITCODE=%ERRORLEVEL%"
 
-if not "%EXITCODE%"=="0" (
-  echo.
-  echo Script failed with exit code %EXITCODE%.
-  pause
+echo.
+if "%EXITCODE%"=="0" (
+  echo ==========================================
+  echo BDFR Messenger MVP test completed SUCCESSFULLY.
+  echo ==========================================
+) else (
+  echo ==========================================
+  echo BDFR Messenger MVP test FAILED.
+  echo Exit code: %EXITCODE%
+  echo ==========================================
 )
 
+echo.
+pause
 exit /b %EXITCODE%
