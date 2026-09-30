@@ -35,6 +35,15 @@ try {
     }
 
     $bad = @($status | Where-Object { $_ -match "^[+-]" })
+
+    if ($IsWindows -or $env:OS -eq "Windows_NT") {
+        $cppgirOnly = @($bad | Where-Object { $_ -match "cmake/external/glib/cppgir" })
+        $bad = @($bad | Where-Object { $_ -notmatch "cmake/external/glib/cppgir" })
+        if ($cppgirOnly.Count -gt 0) {
+            Write-Host "Ignoring cppgir on Windows (GLib/Linux-only build dependency)." -ForegroundColor Yellow
+        }
+    }
+
     if ($bad.Count -gt 0) {
         Write-Host "Some submodules are missing or not on the expected revision:" -ForegroundColor Yellow
         $bad | ForEach-Object { Write-Host $_ }
@@ -49,8 +58,11 @@ try {
                 Write-Host ""
                 Write-Host "cppgir could not be cloned from GitLab because GitLab returned HTTP 403." -ForegroundColor Yellow
                 Write-Host "The main Telegram Desktop source is present; only this nested dependency is blocked." -ForegroundColor Yellow
-                Write-Host "Run Client\Repair-CppGir.bat to repair this dependency separately."
-                exit 2
+                if ($IsWindows -or $env:OS -eq "Windows_NT") {
+                    Write-Host "cppgir is not required for the Windows build and will be skipped." -ForegroundColor Yellow
+                } else {
+                    throw "cppgir dependency is blocked by GitLab HTTP 403."
+                }
             }
             throw "Submodule repair failed."
         }
