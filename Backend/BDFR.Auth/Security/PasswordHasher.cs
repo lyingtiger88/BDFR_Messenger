@@ -24,13 +24,20 @@ public sealed class PasswordHasher
             return false;
 
         var parts = encodedHash.Split('$', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length != 4 || parts[0] != "argon2id")
+        if (parts.Length != 5 || parts[0] != "argon2id" || parts[1] != "v=19")
             return false;
 
-        var salt = Convert.FromBase64String(parts[2]);
-        var expected = Convert.FromBase64String(parts[3]);
-        var actual = await DeriveAsync(password, salt, cancellationToken);
-        return CryptographicOperations.FixedTimeEquals(expected, actual);
+        try
+        {
+            var salt = Convert.FromBase64String(parts[3]);
+            var expected = Convert.FromBase64String(parts[4]);
+            var actual = await DeriveAsync(password, salt, cancellationToken);
+            return CryptographicOperations.FixedTimeEquals(expected, actual);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 
     private static async Task<byte[]> DeriveAsync(string password, byte[] salt, CancellationToken cancellationToken)
