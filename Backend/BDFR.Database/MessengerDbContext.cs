@@ -7,6 +7,7 @@ public sealed class MessengerDbContext(DbContextOptions<MessengerDbContext> opti
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<Session> Sessions => Set<Session>();
+    public DbSet<Message> Messages => Set<Message>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,5 +28,11 @@ public sealed class MessengerDbContext(DbContextOptions<MessengerDbContext> opti
             .WithMany(x => x.Sessions)
             .HasForeignKey(x => x.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        var message = modelBuilder.Entity<Message>();
+        message.HasKey(x => x.Id);
+        message.Property(x => x.Content).HasMaxLength(4000).IsRequired();
+        message.HasIndex(x => new { x.SenderId, x.RecipientId, x.CreatedAt });
+        message.HasIndex(x => new { x.RecipientId, x.ReadAt });
     }
 }
