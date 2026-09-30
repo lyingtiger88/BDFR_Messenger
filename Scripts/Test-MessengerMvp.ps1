@@ -1,3 +1,5 @@
+param([switch]$SkipDockerStart)
+
 $ErrorActionPreference = "Stop"
 $base = "http://localhost:8080"
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -9,39 +11,12 @@ function Post-Json($url, $body, $token = $null) {
     Invoke-RestMethod -Method Post -Uri $url -ContentType "application/json" -Headers $headers -Body ($body | ConvertTo-Json)
 }
 
-Write-Host "Starting BDFR Messenger backend..."
-$composeOutput = @()
-docker compose -f "$compose" up --build -d 2>&1 | Tee-Object -Variable composeOutput
-$composeExitCode = $LASTEXITCODE
-
-if ($composeExitCode -ne 0) {
-    $joined = ($composeOutput | Out-String)
-
-    if ($joined -match "read-only file system") {
-        Write-Host ""
-        Write-Host "Docker Desktop internal storage is READ-ONLY." -ForegroundColor Red
-        Write-Host "This is a Docker Desktop / WSL storage problem, not a BDFR Messenger code error." -ForegroundColor Yellow
-        Write-Host ""
-        Write-Host "Recommended recovery:"
-        Write-Host "  1. Quit Docker Desktop completely."
-        Write-Host "  2. Open CMD or PowerShell as Administrator and run: wsl --shutdown"
-        Write-Host "  3. Make sure drive C: has several GB of free space."
-        Write-Host "  4. Start Docker Desktop again and wait until it is fully ready."
-        Write-Host "  5. Re-run this BAT file."
-        Write-Host ""
-        Write-Host "If it still fails, use Docker Desktop > Troubleshoot > Restart Docker Desktop."
-        Write-Host "Use Clean / Purge data only as a last resort because it deletes local Docker data."
-        throw "Docker Desktop internal filesystem is read-only."
+if (-not $SkipDockerStart) {
+    Write-Host "Starting BDFR Messenger backend..."
+    docker compose -f "$compose" up --build -d
+    if ($LASTEXITCODE -ne 0) {
+        throw "Docker Compose/build failed. Review the Docker output above."
     }
-
-    if ($joined -match "Couldn't find a valid ICU package installed on the system") {
-        Write-Host ""
-        Write-Host "The .NET container image is missing ICU globalization libraries." -ForegroundColor Red
-        Write-Host "Pull the latest BDFR_Messenger version; the Dockerfile now installs ICU explicitly." -ForegroundColor Yellow
-        throw "Docker image is missing ICU globalization support."
-    }
-
-    throw "Docker Compose/build failed. Review the Docker output above."
 }
 
 Write-Host "Waiting for gateway..."
