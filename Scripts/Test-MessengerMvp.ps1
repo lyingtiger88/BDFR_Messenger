@@ -10,9 +10,30 @@ function Post-Json($url, $body, $token = $null) {
 }
 
 Write-Host "Starting BDFR Messenger backend..."
-docker compose -f "$compose" up --build -d
+$composeOutput = docker compose -f "$compose" up --build -d 2>&1
+$composeOutput | ForEach-Object { Write-Host $_ }
+
 if ($LASTEXITCODE -ne 0) {
-    throw "Docker Compose failed. Make sure Docker Desktop is running."
+    $joined = ($composeOutput | Out-String)
+
+    if ($joined -match "read-only file system") {
+        Write-Host ""
+        Write-Host "Docker Desktop internal storage is READ-ONLY." -ForegroundColor Red
+        Write-Host "This is a Docker Desktop / WSL storage problem, not a BDFR Messenger code error." -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "Recommended recovery:"
+        Write-Host "  1. Quit Docker Desktop completely."
+        Write-Host "  2. Open CMD or PowerShell as Administrator and run: wsl --shutdown"
+        Write-Host "  3. Make sure drive C: has several GB of free space."
+        Write-Host "  4. Start Docker Desktop again and wait until it is fully ready."
+        Write-Host "  5. Re-run this BAT file."
+        Write-Host ""
+        Write-Host "If it still fails, use Docker Desktop > Troubleshoot > Restart Docker Desktop."
+        Write-Host "Use Clean / Purge data only as a last resort because it deletes local Docker data."
+        throw "Docker Desktop internal filesystem is read-only."
+    }
+
+    throw "Docker Compose failed. Review the Docker output above."
 }
 
 Write-Host "Waiting for gateway..."
