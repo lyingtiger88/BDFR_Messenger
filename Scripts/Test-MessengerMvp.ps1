@@ -33,7 +33,14 @@ if ($LASTEXITCODE -ne 0) {
         throw "Docker Desktop internal filesystem is read-only."
     }
 
-    throw "Docker Compose failed. Review the Docker output above."
+    if ($joined -match "Couldn't find a valid ICU package installed on the system") {
+        Write-Host ""
+        Write-Host "The .NET container image is missing ICU globalization libraries." -ForegroundColor Red
+        Write-Host "Pull the latest BDFR_Messenger version; the Dockerfile now installs ICU explicitly." -ForegroundColor Yellow
+        throw "Docker image is missing ICU globalization support."
+    }
+
+    throw "Docker Compose/build failed. Review the Docker output above."
 }
 
 Write-Host "Waiting for gateway..."
