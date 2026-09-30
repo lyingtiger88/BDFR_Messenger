@@ -1,5 +1,7 @@
 $ErrorActionPreference = "Stop"
 $base = "http://localhost:8080"
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$compose = Join-Path $repoRoot "Infrastructure\docker-compose.yml"
 
 function Post-Json($url, $body, $token = $null) {
     $headers = @{}
@@ -7,7 +9,33 @@ function Post-Json($url, $body, $token = $null) {
     Invoke-RestMethod -Method Post -Uri $url -ContentType "application/json" -Headers $headers -Body ($body | ConvertTo-Json)
 }
 
-Write-Host "Checking gateway..."
+Write-Host "Starting BDFR Messenger backend..."
+docker compose -f "$compose" up --build -d
+if ($LASTEXITCODE -ne 0) {
+    throw "Docker Compose failed. Make sure Docker Desktop is running."
+}
+
+Write-Host "Waiting for gateway..."
+$ready = $false
+for ($i = 0; $i -lt 60; $i++) {
+    try {
+        $health = Invoke-RestMethod "$base/health" -TimeoutSec 2
+        if ($health.status -eq "ok") {
+            $ready = $true
+            break
+        }
+    } catch {
+    }
+    Start-Sleep -Seconds 2
+}
+
+if (-not $ready) {
+    docker compose -f "$compose" ps
+    docker compose -f "$compose" logs --tail 80 gateway
+    throw "Gateway did not become ready."
+}
+
+Write-Host "Gateway is ready."
 Invoke-RestMethod "$base/health" | ConvertTo-Json
 
 $stamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
