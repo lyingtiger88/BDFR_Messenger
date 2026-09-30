@@ -9,6 +9,11 @@ services:
       - "5432:5432"
     volumes:
       - bdfr-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bdfr -d bdfr_messenger"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
@@ -17,6 +22,24 @@ services:
       - "6379:6379"
     volumes:
       - bdfr-redis:/data
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: Backend/BDFR.Gateway/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=bdfr_messenger;Username=bdfr;Password=${POSTGRES_PASSWORD:-change-me}
+      Jwt__Issuer: BDFR.Messenger
+      Jwt__Audience: BDFR.Messenger.Client
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:-development-only-signing-key-change-before-production-12345}
+      Security__DataEncryptionKeyBase64: ${DATA_ENCRYPTION_KEY_BASE64:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   bdfr-postgres:
