@@ -40,8 +40,18 @@ try {
         $bad | ForEach-Object { Write-Host $_ }
         Write-Host ""
         Write-Host "Repairing submodules..."
-        git submodule update --init --recursive
+        $repair = git submodule update --init --recursive 2>&1
+        $repair | ForEach-Object { Write-Host $_ }
+
         if ($LASTEXITCODE -ne 0) {
+            $repairText = ($repair | Out-String)
+            if ($repairText -match "cppgir" -and $repairText -match "403") {
+                Write-Host ""
+                Write-Host "cppgir could not be cloned from GitLab because GitLab returned HTTP 403." -ForegroundColor Yellow
+                Write-Host "The main Telegram Desktop source is present; only this nested dependency is blocked." -ForegroundColor Yellow
+                Write-Host "Run Client\Repair-CppGir.bat to repair this dependency separately."
+                exit 2
+            }
             throw "Submodule repair failed."
         }
     }
