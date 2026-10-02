@@ -8,6 +8,8 @@ public sealed class MessengerDbContext(DbContextOptions<MessengerDbContext> opti
     public DbSet<User> Users => Set<User>();
     public DbSet<Session> Sessions => Set<Session>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<MarketplaceStore> MarketplaceStores => Set<MarketplaceStore>();
+    public DbSet<SellerBankVerification> SellerBankVerifications => Set<SellerBankVerification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,6 +29,29 @@ public sealed class MessengerDbContext(DbContextOptions<MessengerDbContext> opti
         session.HasOne(x => x.User)
             .WithMany(x => x.Sessions)
             .HasForeignKey(x => x.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        var store = modelBuilder.Entity<MarketplaceStore>();
+        store.HasKey(x => x.Id);
+        store.Property(x => x.Name).HasMaxLength(120).IsRequired();
+        store.Property(x => x.Description).HasMaxLength(2000);
+        store.HasIndex(x => x.OwnerUserId).IsUnique();
+        store.HasOne(x => x.Owner)
+            .WithMany()
+            .HasForeignKey(x => x.OwnerUserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        var bankVerification = modelBuilder.Entity<SellerBankVerification>();
+        bankVerification.HasKey(x => x.Id);
+        bankVerification.Property(x => x.CardNumberEncrypted).HasMaxLength(512);
+        bankVerification.Property(x => x.IbanEncrypted).HasMaxLength(512);
+        bankVerification.Property(x => x.CardLast4).HasMaxLength(4);
+        bankVerification.Property(x => x.BankName).HasMaxLength(120);
+        bankVerification.Property(x => x.Provider).HasMaxLength(120);
+        bankVerification.HasIndex(x => x.StoreId).IsUnique();
+        bankVerification.HasOne(x => x.Store)
+            .WithOne(x => x.BankVerification)
+            .HasForeignKey<SellerBankVerification>(x => x.StoreId)
             .OnDelete(DeleteBehavior.Cascade);
 
         var message = modelBuilder.Entity<Message>();
