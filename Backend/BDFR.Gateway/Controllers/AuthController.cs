@@ -118,7 +118,7 @@ public sealed class AuthController(
 
         var accessExpiry = DateTimeOffset.UtcNow.Add(AccessLifetime);
         var access = tokens.CreateAccessToken(user.Id, user.Username, AccessLifetime);
-        return new AuthResponse(user.Id, user.Username, access, refresh, accessExpiry);
+        return new AuthResponse(user.Id, user.Username, access, refresh, accessExpiry, user.IsSellerVerified);
     }
 
     private byte[] GetDataKey()
