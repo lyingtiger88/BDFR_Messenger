@@ -155,9 +155,18 @@ public sealed class BankValidationService(
     private static string? NormalizeDigits(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
-        var digits = value.Where(char.IsDigit).ToArray();
-        return digits.Length == 0 ? null : new string(digits);
+
+        var normalized = new string(value.Trim().Select(NormalizeDigit).ToArray());
+        return normalized.All(char.IsDigit) && normalized.Length > 0 ? normalized : null;
     }
+
+    private static string NormalizeDigit(char c) => c switch
+    {
+        >= '0' and <= '9' => c,
+        >= '\u0660' and <= '\u0669' => (char)('0' + c - '\u0660'),
+        >= '\u06F0' and <= '\u06F9' => (char)('0' + c - '\u06F0'),
+        _ => c
+    };
 
     private static string? NormalizeAccount(string? value)
     {
@@ -169,14 +178,17 @@ public sealed class BankValidationService(
     private static string? NormalizeIban(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
-        var result = value.Replace(" ", "").Trim().ToUpperInvariant();
+        var result = new string(value.Trim().Select(NormalizeDigit).ToArray())
+            .Replace(" ", "")
+            .Trim()
+            .ToUpperInvariant();
         return result.StartsWith("IR", StringComparison.Ordinal) ? result : null;
     }
 
     private static string? NormalizeBirthDate(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
-        var result = value.Trim().Replace("-", "/");
+        var result = new string(value.Trim().Select(NormalizeDigit).ToArray()).Replace("-", "/");
         var parts = result.Split('/');
         return parts.Length == 3 && parts.All(p => p.All(char.IsDigit)) ? result : null;
     }
