@@ -12,17 +12,24 @@ public sealed class BankValidationService(
     public async Task<BankValidationResult> ValidateAsync(
         string? cardNumber,
         string? iban,
+        string? accountNumber,
+        string? bankCode,
         string? nationalCode,
         string? birthDate,
         CancellationToken ct)
     {
         cardNumber = NormalizeDigits(cardNumber);
         iban = NormalizeIban(iban);
+        accountNumber = NormalizeAccount(accountNumber);
+        bankCode = NormalizeDigits(bankCode);
         nationalCode = NormalizeDigits(nationalCode);
         birthDate = NormalizeBirthDate(birthDate);
 
-        if (cardNumber is null && iban is null)
-            return Fail("none", "A valid Iranian bank card or IBAN is required.");
+        var identifiers = new[] { cardNumber, iban, accountNumber }
+            .Count(x => !string.IsNullOrWhiteSpace(x));
+
+        if (identifiers != 1)
+            return Fail("local", "Provide exactly one of bank card, IBAN, or bank account number.");
 
         if (nationalCode is null || nationalCode.Length != 10)
             return Fail("local", "A valid 10-digit national code is required.");
@@ -32,6 +39,9 @@ public sealed class BankValidationService(
 
         if (iban is not null && !IsValidIban(iban))
             return Fail("local", "The Iranian IBAN is invalid.");
+
+        if (accountNumber is not null && string.IsNullOrWhiteSpace(bankCode))
+            return Fail("local", "Bank code is required when verifying a bank account number.");
 
         if (cardNumber is not null && birthDate is null)
             return Fail("local", "Birth date is required when verifying a bank card.");
@@ -43,8 +53,6 @@ public sealed class BankValidationService(
         try
         {
             using var client = httpClientFactory.CreateClient("BankValidation");
-            client.DefaultRequestHeaders.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
             string bankName;
             string? verifiedIban = iban;
@@ -54,7 +62,7 @@ public sealed class BankValidationService(
             {
                 var info = await PostAsync<ProviderEnvelope<CardInfo>>(
                     client,
-                    "https://s.api.ir/api/sw1/CardToIban",
+                    "/api/sw1/CardToIban",
                     new { cardNumber },
                     ct);
 
@@ -66,34 +74,54 @@ public sealed class BankValidationService(
 
                 var match = await PostAsync<ProviderEnvelope<bool>>(
                     client,
-                    "https://s.api.ir/api/sw1/CardMatch",
+                    "/api/sw1/CardMatch",
                     new { nationalCode, birthDate, cardNumber },
                     ct);
 
                 if (!match.Success || match.Data != true)
-                    return Fail("api.ir", "The bank card does not match the supplied national code and birth date.");
+                    return Fail("api.ir", match.Message ?? "The bank card does not match the supplied national code and birth date.");
             }
             else
             {
-                var info = await PostAsync<ProviderEnvelope<IbanInfo>>(
-                    client,
-                    "https://s.api.ir/api/sw1/IbanInfo",
-                    new { iban },
-                    ct);
+                if (accountNumber is not null)
+                {
+                    var account = await PostAsync<ProviderEnvelope<BankAccountInfo>>(
+                        client,
+                        "/api/sw1/BankAccountInfo",
+                        new { accountNumber, bankCode },
+                        ct);
 
-                if (!info.Success || info.Data is null || !info.Data.Active)
-                    return Fail("api.ir", "The IBAN is invalid or inactive.");
+                    if (!account.Success || account.Data is null || !account.Data.Active)
+                        return Fail("api.ir", account.Message ?? "The bank account is invalid or inactive.");
 
-                bankName = info.Data.BankName ?? "Unknown";
+                    verifiedIban = NormalizeIban(account.Data.Iban);
+                    if (verifiedIban is null)
+                        return Fail("api.ir", "The bank account did not return a valid IBAN.");
+
+                    bankName = account.Data.BankName ?? "Unknown";
+                }
+                else
+                {
+                    var info = await PostAsync<ProviderEnvelope<IbanInfo>>(
+                        client,
+                        "/api/sw1/IbanInfo",
+                        new { iban },
+                        ct);
+
+                    if (!info.Success || info.Data is null || !info.Data.Active)
+                        return Fail("api.ir", info.Message ?? "The IBAN is invalid or inactive.");
+
+                    bankName = info.Data.BankName ?? "Unknown";
+                }
 
                 var match = await PostAsync<ProviderEnvelope<bool>>(
                     client,
-                    "https://s.api.ir/api/sw1/IbanMatchPro",
-                    new { nationalCode, iban },
+                    "/api/sw1/IbanMatchPro",
+                    new { nationalCode, iban = verifiedIban },
                     ct);
 
                 if (!match.Success || match.Data != true)
-                    return Fail("api.ir", "The IBAN does not match the supplied national code.");
+                    return Fail("api.ir", match.Message ?? "The bank account does not match the supplied national code.");
             }
 
             return new(true, bankName, verifiedIban, last4, "api.ir", null);
@@ -111,11 +139,11 @@ public sealed class BankValidationService(
 
     private async Task<T> PostAsync<T>(
         HttpClient client,
-        string url,
+        string path,
         object body,
         CancellationToken ct)
     {
-        using var response = await client.PostAsJsonAsync(url, body, ct);
+        using var response = await client.PostAsJsonAsync(path, body, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<T>(cancellationToken: ct)
             ?? throw new JsonException("Empty API.IR response.");
@@ -129,6 +157,13 @@ public sealed class BankValidationService(
         if (string.IsNullOrWhiteSpace(value)) return null;
         var digits = value.Where(char.IsDigit).ToArray();
         return digits.Length == 0 ? null : new string(digits);
+    }
+
+    private static string? NormalizeAccount(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var result = value.Trim().Replace(" ", "").Replace("-", "");
+        return result.Length is >= 5 and <= 30 ? result : null;
     }
 
     private static string? NormalizeIban(string? value)
@@ -189,4 +224,9 @@ public sealed class BankValidationService(
         [property: JsonPropertyName("name")] string? Name,
         [property: JsonPropertyName("bankName")] string? BankName,
         [property: JsonPropertyName("active")] bool Active);
+
+    private sealed record BankAccountInfo(
+        [property: JsonPropertyName("iban")] string? Iban,
+        [property: JsonPropertyName("active")] bool Active,
+        [property: JsonPropertyName("bankName")] string? BankName);
 }
