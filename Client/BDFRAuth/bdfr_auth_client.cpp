@@ -143,6 +143,7 @@ std::optional<AuthSession> AuthClient::parseSession(
         .username = object.value(QStringLiteral("username")).toString(),
         .accessToken = object.value(QStringLiteral("accessToken")).toString(),
         .refreshToken = object.value(QStringLiteral("refreshToken")).toString(),
+        .isSellerVerified = object.value(QStringLiteral("isSellerVerified")).toBool(false),
     };
 
     if (result.userId.isNull()
