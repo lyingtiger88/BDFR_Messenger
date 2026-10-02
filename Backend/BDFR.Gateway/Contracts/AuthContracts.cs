@@ -20,4 +20,5 @@ public sealed record AuthResponse(
     string Username,
     string AccessToken,
     string RefreshToken,
-    DateTimeOffset AccessTokenExpiresAt);
+    DateTimeOffset AccessTokenExpiresAt,
+    bool IsSellerVerified = false);
