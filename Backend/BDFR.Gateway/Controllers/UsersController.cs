@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using BDFR.Database;
+using BDFR.Gateway.Contracts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +12,40 @@ namespace BDFR.Gateway.Controllers;
 [Route("api/users")]
 public sealed class UsersController(MessengerDbContext db) : ControllerBase
 {
+    [HttpGet("me")]
+    public async Task<ActionResult<UserProfileResponse>> Me(CancellationToken ct)
+    {
+        var userId = CurrentUserId();
+        if (userId is null) return Unauthorized();
+
+        var user = await db.Users
+            .AsNoTracking()
+            .Where(x => x.Id == userId.Value && x.IsActive)
+            .Select(x => new
+            {
+                x.Id,
+                x.Username,
+                x.CreatedAt,
+                x.LastSeenAt,
+                x.IsActive,
+                x.IsSellerVerified,
+                HasStore = db.MarketplaceStores.Any(s => s.OwnerUserId == x.Id)
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (user is null) return NotFound();
+
+        return Ok(new UserProfileResponse(
+            user.Id,
+            user.Username,
+            user.CreatedAt,
+            user.LastSeenAt,
+            user.IsActive,
+            user.IsSellerVerified,
+            user.IsSellerVerified ? "verified_seller" : null,
+            user.HasStore));
+    }
+
     [HttpGet("search")]
     public async Task<IActionResult> Search([FromQuery] string q, CancellationToken ct)
     {
@@ -20,9 +56,23 @@ public sealed class UsersController(MessengerDbContext db) : ControllerBase
             .Where(x => x.IsActive && x.Username.Contains(q))
             .OrderBy(x => x.Username)
             .Take(20)
-            .Select(x => new { x.Id, x.Username, x.LastSeenAt, x.IsSellerVerified })
+            .Select(x => new
+            {
+                x.Id,
+                x.Username,
+                x.LastSeenAt,
+                x.IsSellerVerified,
+                VerificationBadge = x.IsSellerVerified ? "verified_seller" : null,
+                HasStore = db.MarketplaceStores.Any(s => s.OwnerUserId == x.Id)
+            })
             .ToListAsync(ct);
 
         return Ok(users);
+    }
+
+    private Guid? CurrentUserId()
+    {
+        var value = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        return Guid.TryParse(value, out var id) ? id : null;
     }
 }
