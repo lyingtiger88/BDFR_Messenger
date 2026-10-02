@@ -8,4 +8,5 @@ public sealed record UserProfileResponse(
     bool IsActive,
     bool IsSellerVerified,
     string? VerificationBadge,
+    string? VerificationBadgeColor,
     bool HasStore);
