@@ -13,5 +13,7 @@ public interface IBankValidationService
     Task<BankValidationResult> ValidateAsync(
         string? cardNumber,
         string? iban,
+        string? nationalCode,
+        string? birthDate,
         CancellationToken cancellationToken);
 }
