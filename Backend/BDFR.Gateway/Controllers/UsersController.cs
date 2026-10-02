@@ -43,6 +43,7 @@ public sealed class UsersController(MessengerDbContext db) : ControllerBase
             user.IsActive,
             user.IsSellerVerified,
             user.IsSellerVerified ? "verified_seller" : null,
+            user.IsSellerVerified ? "blue" : null,
             user.HasStore));
     }
 
@@ -63,6 +64,7 @@ public sealed class UsersController(MessengerDbContext db) : ControllerBase
                 x.LastSeenAt,
                 x.IsSellerVerified,
                 VerificationBadge = x.IsSellerVerified ? "verified_seller" : null,
+                VerificationBadgeColor = x.IsSellerVerified ? "blue" : null,
                 HasStore = db.MarketplaceStores.Any(s => s.OwnerUserId == x.Id)
             })
             .ToListAsync(ct);
