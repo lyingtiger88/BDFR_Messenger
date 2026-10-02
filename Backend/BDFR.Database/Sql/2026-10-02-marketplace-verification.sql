@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS "SellerBankVerifications" (
     "StoreId" uuid NOT NULL,
     "CardNumberEncrypted" varchar(512) NULL,
     "IbanEncrypted" varchar(512) NULL,
+    "AccountNumberEncrypted" varchar(512) NULL,
+    "BankCode" varchar(8) NULL,
     "CardLast4" varchar(4) NULL,
     "BankName" varchar(120) NULL,
     "Status" integer NOT NULL,
