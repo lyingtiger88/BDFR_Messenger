@@ -4,6 +4,7 @@ using BDFR.Auth.Security;
 using BDFR.Auth.Tokens;
 using BDFR.Database;
 using BDFR.Gateway.Realtime;
+using BDFR.Gateway.Marketplace;
 using BDFR.Security.Cryptography;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.SignalR;
@@ -19,6 +20,11 @@ if (Encoding.UTF8.GetByteCount(jwtKey) < 32)
     throw new InvalidOperationException("JWT signing key must be at least 32 bytes.");
 
 builder.Services.AddControllers();
+builder.Services.AddHttpClient("BankValidation", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+builder.Services.AddScoped<IBankValidationService, BankValidationService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IUserIdProvider, NameIdentifierUserIdProvider>();
