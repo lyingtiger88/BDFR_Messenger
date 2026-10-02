@@ -8,6 +8,8 @@ public sealed class SellerBankVerification
     // Never store raw card/account numbers.
     public string? CardNumberEncrypted { get; set; }
     public string? IbanEncrypted { get; set; }
+    public string? AccountNumberEncrypted { get; set; }
+    public string? BankCode { get; set; }
     public string? CardLast4 { get; set; }
     public string? BankName { get; set; }
 
