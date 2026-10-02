@@ -32,13 +32,15 @@ public sealed class MarketplaceController(
         if (request.Kind is < StoreKind.Products or > StoreKind.ProductsAndServices)
             return BadRequest(new { error = "Invalid store kind." });
 
-        if (string.IsNullOrWhiteSpace(request.CardNumber) && string.IsNullOrWhiteSpace(request.Iban))
-            return BadRequest(new { error = "Seller verification requires a valid bank card or IBAN." });
+        if (string.IsNullOrWhiteSpace(request.CardNumber) &&
+            string.IsNullOrWhiteSpace(request.Iban) &&
+            string.IsNullOrWhiteSpace(request.AccountNumber))
+            return BadRequest(new { error = "Seller verification requires a valid bank card, IBAN, or bank account number." });
 
         if (await db.MarketplaceStores.AnyAsync(x => x.OwnerUserId == userId.Value, ct))
             return Conflict(new { error = "This profile already has a store." });
 
-        var validation = await bankValidation.ValidateAsync(request.CardNumber, request.Iban, request.NationalCode, request.BirthDate, ct);
+        var validation = await bankValidation.ValidateAsync(request.CardNumber, request.Iban, request.AccountNumber, request.BankCode, request.NationalCode, request.BirthDate, ct);
         if (!validation.IsValid)
             return BadRequest(new { error = validation.Error ?? "Bank verification failed." });
 
@@ -99,7 +101,9 @@ public sealed class MarketplaceController(
         store.Kind = request.Kind;
         store.UpdatedAt = DateTimeOffset.UtcNow;
 
-        if (!string.IsNullOrWhiteSpace(request.CardNumber) || !string.IsNullOrWhiteSpace(request.Iban))
+        if (!string.IsNullOrWhiteSpace(request.CardNumber) ||
+            !string.IsNullOrWhiteSpace(request.Iban) ||
+            !string.IsNullOrWhiteSpace(request.AccountNumber))
         {
             var validation = await bankValidation.ValidateAsync(request.CardNumber, request.Iban, request.NationalCode, request.BirthDate, ct);
             if (!validation.IsValid)
@@ -136,6 +140,12 @@ public sealed class MarketplaceController(
 
         if (!string.IsNullOrWhiteSpace(request.Iban))
             verification.IbanEncrypted = protector.Encrypt(request.Iban.Trim().ToUpperInvariant(), key);
+
+        if (!string.IsNullOrWhiteSpace(request.AccountNumber))
+            verification.AccountNumberEncrypted = protector.Encrypt(request.AccountNumber.Trim(), key);
+
+        if (!string.IsNullOrWhiteSpace(request.BankCode))
+            verification.BankCode = request.BankCode.Trim();
 
         verification.BankName = validation.BankName;
         verification.Status = SellerVerificationStatus.Verified;
