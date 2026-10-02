@@ -22,7 +22,8 @@ if (Encoding.UTF8.GetByteCount(jwtKey) < 32)
 builder.Services.AddControllers();
 builder.Services.AddHttpClient("BankValidation", client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(10);
+    client.BaseAddress = new Uri(builder.Configuration["BankValidation:BaseUrl"] ?? "https://s.api.ir");
+    client.Timeout = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddScoped<IBankValidationService, BankValidationService>();
 builder.Services.AddEndpointsApiExplorer();
