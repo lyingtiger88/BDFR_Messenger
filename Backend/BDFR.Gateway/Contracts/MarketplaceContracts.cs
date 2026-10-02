@@ -8,6 +8,8 @@ public sealed record CreateStoreRequest(
     StoreKind Kind,
     string? CardNumber,
     string? Iban,
+    string? AccountNumber,
+    string? BankCode,
     string? NationalCode,
     string? BirthDate);
 
