@@ -44,5 +44,9 @@ CREATE TABLE IF NOT EXISTS "SellerBankVerifications" (
         FOREIGN KEY ("StoreId") REFERENCES "MarketplaceStores" ("Id") ON DELETE CASCADE
 );
 
+ALTER TABLE "SellerBankVerifications"
+    ADD COLUMN IF NOT EXISTS "AccountNumberEncrypted" varchar(512) NULL,
+    ADD COLUMN IF NOT EXISTS "BankCode" varchar(8) NULL;
+
 CREATE UNIQUE INDEX IF NOT EXISTS "IX_SellerBankVerifications_StoreId"
     ON "SellerBankVerifications" ("StoreId");
