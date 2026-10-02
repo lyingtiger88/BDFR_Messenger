@@ -10,5 +10,7 @@ public sealed class User
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? LastSeenAt { get; set; }
     public bool IsActive { get; set; } = true;
+    public bool IsSellerVerified { get; set; }
+    public DateTimeOffset? SellerVerifiedAt { get; set; }
     public ICollection<Session> Sessions { get; set; } = new List<Session>();
 }
