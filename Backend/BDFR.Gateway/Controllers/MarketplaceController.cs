@@ -38,9 +38,14 @@ public sealed class MarketplaceController(
         if (await db.MarketplaceStores.AnyAsync(x => x.OwnerUserId == userId.Value, ct))
             return Conflict(new { error = "This profile already has a store." });
 
-        var validation = await bankValidation.ValidateAsync(request.CardNumber, request.Iban, ct);
+        var validation = await bankValidation.ValidateAsync(request.CardNumber, request.Iban, request.NationalCode, request.BirthDate, ct);
         if (!validation.IsValid)
             return BadRequest(new { error = validation.Error ?? "Bank verification failed." });
+
+        var owner = await db.Users.FirstAsync(x => x.Id == userId.Value, ct);
+        var identityKey = GetDataKey();
+        owner.NationalCodeEncrypted = protector.Encrypt(request.NationalCode!.Trim(), identityKey);
+        owner.BirthDateEncrypted = protector.Encrypt(request.BirthDate!.Trim(), identityKey);
 
         var store = new MarketplaceStore
         {
@@ -52,7 +57,6 @@ public sealed class MarketplaceController(
         };
 
         db.MarketplaceStores.Add(store);
-        var owner = await db.Users.FirstAsync(x => x.Id == userId.Value, ct);
         owner.IsSellerVerified = true;
         owner.SellerVerifiedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
@@ -95,13 +99,19 @@ public sealed class MarketplaceController(
 
         if (!string.IsNullOrWhiteSpace(request.CardNumber) || !string.IsNullOrWhiteSpace(request.Iban))
         {
-            var validation = await bankValidation.ValidateAsync(request.CardNumber, request.Iban, ct);
+            var validation = await bankValidation.ValidateAsync(request.CardNumber, request.Iban, request.NationalCode, request.BirthDate, ct);
             if (!validation.IsValid)
                 return BadRequest(new { error = validation.Error ?? "Bank verification failed." });
 
             store.BankVerification = CreateVerification(request, validation, store.BankVerification);
             var owner = await db.Users.FirstAsync(x => x.Id == userId.Value, ct);
+            var identityKey = GetDataKey();
+            if (!string.IsNullOrWhiteSpace(request.NationalCode))
+                owner.NationalCodeEncrypted = protector.Encrypt(request.NationalCode.Trim(), identityKey);
+            if (!string.IsNullOrWhiteSpace(request.BirthDate))
+                owner.BirthDateEncrypted = protector.Encrypt(request.BirthDate.Trim(), identityKey);
             owner.IsSellerVerified = true;
+            owner.SellerVerifiedAt = DateTimeOffset.UtcNow;
             owner.SellerVerifiedAt = DateTimeOffset.UtcNow;
         }
 
