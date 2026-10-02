@@ -14,6 +14,7 @@ struct AuthSession {
     QString username;
     QString accessToken;
     QString refreshToken;
+    bool isSellerVerified = false;
 };
 
 struct AuthError {
