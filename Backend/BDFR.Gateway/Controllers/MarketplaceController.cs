@@ -52,6 +52,9 @@ public sealed class MarketplaceController(
         };
 
         db.MarketplaceStores.Add(store);
+        var owner = await db.Users.FirstAsync(x => x.Id == userId.Value, ct);
+        owner.IsSellerVerified = true;
+        owner.SellerVerifiedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
         return Created($"/api/marketplace/stores/{store.Id}", ToResponse(store));
     }
@@ -97,6 +100,9 @@ public sealed class MarketplaceController(
                 return BadRequest(new { error = validation.Error ?? "Bank verification failed." });
 
             store.BankVerification = CreateVerification(request, validation, store.BankVerification);
+            var owner = await db.Users.FirstAsync(x => x.Id == userId.Value, ct);
+            owner.IsSellerVerified = true;
+            owner.SellerVerifiedAt = DateTimeOffset.UtcNow;
         }
 
         await db.SaveChangesAsync(ct);
