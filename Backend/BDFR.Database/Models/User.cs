@@ -12,5 +12,7 @@ public sealed class User
     public bool IsActive { get; set; } = true;
     public bool IsSellerVerified { get; set; }
     public DateTimeOffset? SellerVerifiedAt { get; set; }
+    public string? NationalCodeEncrypted { get; set; }
+    public string? BirthDateEncrypted { get; set; }
     public ICollection<Session> Sessions { get; set; } = new List<Session>();
 }
