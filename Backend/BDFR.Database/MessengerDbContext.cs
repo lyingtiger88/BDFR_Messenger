@@ -21,6 +21,8 @@ public sealed class MessengerDbContext(DbContextOptions<MessengerDbContext> opti
         user.Property(x => x.EmailLookupHash).HasMaxLength(64).IsRequired();
         user.HasIndex(x => x.EmailLookupHash).IsUnique();
         user.Property(x => x.PasswordHash).IsRequired();
+        user.Property(x => x.IsSellerVerified).IsRequired();
+        user.HasIndex(x => x.IsSellerVerified);
 
         var session = modelBuilder.Entity<Session>();
         session.HasKey(x => x.Id);
