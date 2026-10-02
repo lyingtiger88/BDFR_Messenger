@@ -7,7 +7,9 @@ public sealed record CreateStoreRequest(
     string? Description,
     StoreKind Kind,
     string? CardNumber,
-    string? Iban);
+    string? Iban,
+    string? NationalCode,
+    string? BirthDate);
 
 public sealed record StoreResponse(
     Guid Id,
