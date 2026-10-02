@@ -44,8 +44,10 @@ public sealed class MarketplaceController(
 
         var owner = await db.Users.FirstAsync(x => x.Id == userId.Value, ct);
         var identityKey = GetDataKey();
-        owner.NationalCodeEncrypted = protector.Encrypt(request.NationalCode!.Trim(), identityKey);
-        owner.BirthDateEncrypted = protector.Encrypt(request.BirthDate!.Trim(), identityKey);
+        if (!string.IsNullOrWhiteSpace(request.NationalCode))
+            owner.NationalCodeEncrypted = protector.Encrypt(request.NationalCode.Trim(), identityKey);
+        if (!string.IsNullOrWhiteSpace(request.BirthDate))
+            owner.BirthDateEncrypted = protector.Encrypt(request.BirthDate.Trim(), identityKey);
 
         var store = new MarketplaceStore
         {
@@ -111,7 +113,6 @@ public sealed class MarketplaceController(
             if (!string.IsNullOrWhiteSpace(request.BirthDate))
                 owner.BirthDateEncrypted = protector.Encrypt(request.BirthDate.Trim(), identityKey);
             owner.IsSellerVerified = true;
-            owner.SellerVerifiedAt = DateTimeOffset.UtcNow;
             owner.SellerVerifiedAt = DateTimeOffset.UtcNow;
         }
 
