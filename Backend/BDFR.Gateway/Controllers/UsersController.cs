@@ -20,7 +20,7 @@ public sealed class UsersController(MessengerDbContext db) : ControllerBase
             .Where(x => x.IsActive && x.Username.Contains(q))
             .OrderBy(x => x.Username)
             .Take(20)
-            .Select(x => new { x.Id, x.Username, x.LastSeenAt })
+            .Select(x => new { x.Id, x.Username, x.LastSeenAt, x.IsSellerVerified })
             .ToListAsync(ct);
 
         return Ok(users);
