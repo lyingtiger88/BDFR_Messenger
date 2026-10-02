@@ -51,11 +51,17 @@ public sealed class MarketplaceController(
         if (!string.IsNullOrWhiteSpace(request.BirthDate))
             owner.BirthDateEncrypted = protector.Encrypt(request.BirthDate.Trim(), identityKey);
 
+        var description = string.IsNullOrWhiteSpace(request.Description)
+            ? null
+            : request.Description.Trim();
+        if (description?.Length > 2000)
+            return BadRequest(new { error = "Store description must be at most 2000 characters." });
+
         var store = new MarketplaceStore
         {
             OwnerUserId = userId.Value,
             Name = name,
-            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
+            Description = description,
             Kind = request.Kind,
             BankVerification = CreateVerification(request, validation)
         };
@@ -126,7 +132,7 @@ public sealed class MarketplaceController(
             !string.IsNullOrWhiteSpace(request.Iban) ||
             !string.IsNullOrWhiteSpace(request.AccountNumber))
         {
-            var validation = await bankValidation.ValidateAsync(request.CardNumber, request.Iban, request.NationalCode, request.BirthDate, ct);
+            var validation = await bankValidation.ValidateAsync(request.CardNumber, request.Iban, request.AccountNumber, request.BankCode, request.NationalCode, request.BirthDate, ct);
             if (!validation.IsValid)
                 return BadRequest(new { error = validation.Error ?? "Bank verification failed." });
 
