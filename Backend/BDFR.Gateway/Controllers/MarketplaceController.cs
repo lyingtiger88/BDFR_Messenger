@@ -67,6 +67,18 @@ public sealed class MarketplaceController(
         return Created($"/api/marketplace/stores/{store.Id}", ToResponse(store));
     }
 
+    [HttpGet("stores/{ownerUserId:guid}")]
+    [AllowAnonymous]
+    public async Task<ActionResult<StoreResponse>> GetStore(Guid ownerUserId, CancellationToken ct)
+    {
+        var store = await db.MarketplaceStores
+            .AsNoTracking()
+            .Include(x => x.BankVerification)
+            .FirstOrDefaultAsync(x => x.OwnerUserId == ownerUserId && x.IsActive, ct);
+
+        return store is null ? NotFound() : Ok(ToResponse(store));
+    }
+
     [HttpGet("stores/me")]
     public async Task<ActionResult<StoreResponse>> GetMyStore(CancellationToken ct)
     {
@@ -96,8 +108,17 @@ public sealed class MarketplaceController(
         if (string.IsNullOrWhiteSpace(name) || name.Length > 120)
             return BadRequest(new { error = "Store name must be 1-120 characters." });
 
+        if (request.Kind is < StoreKind.Products or > StoreKind.ProductsAndServices)
+            return BadRequest(new { error = "Invalid store kind." });
+
+        var description = string.IsNullOrWhiteSpace(request.Description)
+            ? null
+            : request.Description.Trim();
+        if (description?.Length > 2000)
+            return BadRequest(new { error = "Store description must be at most 2000 characters." });
+
         store.Name = name;
-        store.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
+        store.Description = description;
         store.Kind = request.Kind;
         store.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -177,6 +198,9 @@ public sealed class MarketplaceController(
         store.Kind,
         store.IsActive,
         store.BankVerification?.Status ?? SellerVerificationStatus.Pending,
+        store.BankVerification?.Status == SellerVerificationStatus.Verified,
+        store.BankVerification?.Status == SellerVerificationStatus.Verified ? "verified_seller" : null,
+        store.BankVerification?.Status == SellerVerificationStatus.Verified ? "blue" : null,
         store.BankVerification?.BankName,
         store.BankVerification?.CardLast4,
         store.CreatedAt,
