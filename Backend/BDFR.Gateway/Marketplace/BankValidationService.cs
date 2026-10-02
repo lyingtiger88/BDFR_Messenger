@@ -35,7 +35,12 @@ public sealed class BankValidationService(
             using var client = httpClientFactory.CreateClient("BankValidation");
             using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
             request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {apiKey}");
-            request.Content = JsonContent.Create(new { cardNumber, iban });
+            request.Content = JsonContent.Create(new
+            {
+                request_id = Guid.NewGuid().ToString("N"),
+                card_number = cardNumber,
+                iban
+            });
 
             using var response = await client.SendAsync(request, ct);
             if (!response.IsSuccessStatusCode)
@@ -45,7 +50,7 @@ public sealed class BankValidationService(
             var payload = await response.Content.ReadFromJsonAsync<ProviderResponse>(
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
 
-            if (payload?.Success != true || payload.Data is null)
+            if (!string.Equals(payload?.Status, "success", StringComparison.OrdinalIgnoreCase) || payload.Data is null)
                 return new(false, null, null, null, "provider",
                     payload?.Message ?? "Bank validation failed.");
 
@@ -109,12 +114,12 @@ public sealed class BankValidationService(
     }
 
     private sealed record ProviderResponse(
-        [property: JsonPropertyName("success")] bool Success,
+        [property: JsonPropertyName("status")] string? Status,
         [property: JsonPropertyName("message")] string? Message,
         [property: JsonPropertyName("data")] ProviderData? Data);
 
     private sealed record ProviderData(
-        [property: JsonPropertyName("bankName")] string? BankName,
+        [property: JsonPropertyName("bank_name")] string? BankName,
         [property: JsonPropertyName("iban")] string? Iban,
-        [property: JsonPropertyName("cardNumber")] string? CardNumber);
+        [property: JsonPropertyName("card_number")] string? CardNumber);
 }
