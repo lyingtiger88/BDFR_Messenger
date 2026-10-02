@@ -49,6 +49,8 @@ public sealed class MessengerDbContext(DbContextOptions<MessengerDbContext> opti
         bankVerification.HasKey(x => x.Id);
         bankVerification.Property(x => x.CardNumberEncrypted).HasMaxLength(512);
         bankVerification.Property(x => x.IbanEncrypted).HasMaxLength(512);
+        bankVerification.Property(x => x.AccountNumberEncrypted).HasMaxLength(512);
+        bankVerification.Property(x => x.BankCode).HasMaxLength(8);
         bankVerification.Property(x => x.CardLast4).HasMaxLength(4);
         bankVerification.Property(x => x.BankName).HasMaxLength(120);
         bankVerification.Property(x => x.Provider).HasMaxLength(120);
