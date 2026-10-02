@@ -9,66 +9,120 @@ public sealed class BankValidationService(
     IConfiguration configuration,
     ILogger<BankValidationService> logger) : IBankValidationService
 {
-    public async Task<BankValidationResult> ValidateAsync(string? cardNumber, string? iban, CancellationToken ct)
+    public async Task<BankValidationResult> ValidateAsync(
+        string? cardNumber,
+        string? iban,
+        string? nationalCode,
+        string? birthDate,
+        CancellationToken ct)
     {
         cardNumber = NormalizeDigits(cardNumber);
         iban = NormalizeIban(iban);
+        nationalCode = NormalizeDigits(nationalCode);
+        birthDate = NormalizeBirthDate(birthDate);
 
         if (cardNumber is null && iban is null)
-            return new(false, null, null, null, "none", "A valid Iranian bank card or IBAN is required.");
+            return Fail("none", "A valid Iranian bank card or IBAN is required.");
+
+        if (nationalCode is null || nationalCode.Length != 10)
+            return Fail("local", "A valid 10-digit national code is required.");
 
         if (cardNumber is not null && !IsValidCard(cardNumber))
-            return new(false, null, null, null, "local", "The Iranian bank card number is invalid.");
+            return Fail("local", "The Iranian bank card number is invalid.");
 
         if (iban is not null && !IsValidIban(iban))
-            return new(false, null, null, null, "local", "The Iranian IBAN is invalid.");
+            return Fail("local", "The Iranian IBAN is invalid.");
 
-        var endpoint = configuration["BankValidation:Endpoint"];
-        var apiKey = configuration["BankValidation:ApiKey"];
+        if (cardNumber is not null && birthDate is null)
+            return Fail("local", "Birth date is required when verifying a bank card.");
 
-        if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(apiKey))
-            return new(false, null, null, null, "configuration",
-                "Bank validation API is not configured.");
+        var token = configuration["BankValidation:ApiIrToken"];
+        if (string.IsNullOrWhiteSpace(token))
+            return Fail("configuration", "API.IR token is not configured.");
 
         try
         {
             using var client = httpClientFactory.CreateClient("BankValidation");
-            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-            request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {apiKey}");
-            request.Content = JsonContent.Create(new
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            string bankName;
+            string? verifiedIban = iban;
+            string? last4 = cardNumber is null ? null : cardNumber[^4..];
+
+            if (cardNumber is not null)
             {
-                request_id = Guid.NewGuid().ToString("N"),
-                card_number = cardNumber,
-                iban
-            });
+                var info = await PostAsync<ProviderEnvelope<CardInfo>>(
+                    client,
+                    "https://s.api.ir/api/sw1/CardToIban",
+                    new { cardNumber },
+                    ct);
 
-            using var response = await client.SendAsync(request, ct);
-            if (!response.IsSuccessStatusCode)
-                return new(false, null, null, null, "provider",
-                    "Bank validation provider rejected the request.");
+                if (!info.Success || info.Data is null)
+                    return Fail("api.ir", info.Message ?? "Card inquiry failed.");
 
-            var payload = await response.Content.ReadFromJsonAsync<ProviderResponse>(
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+                bankName = info.Data.BankName ?? "Unknown";
+                verifiedIban ??= NormalizeIban(info.Data.Iban);
 
-            if (!string.Equals(payload?.Status, "success", StringComparison.OrdinalIgnoreCase) || payload.Data is null)
-                return new(false, null, null, null, "provider",
-                    payload?.Message ?? "Bank validation failed.");
+                var match = await PostAsync<ProviderEnvelope<bool>>(
+                    client,
+                    "https://s.api.ir/api/sw1/CardMatch",
+                    new { nationalCode, birthDate, cardNumber },
+                    ct);
 
-            var returnedIban = NormalizeIban(payload.Data.Iban) ?? iban;
-            var returnedCard = NormalizeDigits(payload.Data.CardNumber);
-            var last4 = returnedCard is { Length: 16 } ? returnedCard[^4..]
-                : cardNumber is { Length: 16 } ? cardNumber[^4..] : null;
+                if (!match.Success || match.Data != true)
+                    return Fail("api.ir", "The bank card does not match the supplied national code and birth date.");
+            }
+            else
+            {
+                var info = await PostAsync<ProviderEnvelope<IbanInfo>>(
+                    client,
+                    "https://s.api.ir/api/sw1/IbanInfo",
+                    new { iban },
+                    ct);
 
-            return new(true, payload.Data.BankName, returnedIban, last4,
-                "configured-provider", null);
+                if (!info.Success || info.Data is null || !info.Data.Active)
+                    return Fail("api.ir", "The IBAN is invalid or inactive.");
+
+                bankName = info.Data.BankName ?? "Unknown";
+
+                var match = await PostAsync<ProviderEnvelope<bool>>(
+                    client,
+                    "https://s.api.ir/api/sw1/IbanMatchPro",
+                    new { nationalCode, iban },
+                    ct);
+
+                if (!match.Success || match.Data != true)
+                    return Fail("api.ir", "The IBAN does not match the supplied national code.");
+            }
+
+            return new(true, bankName, verifiedIban, last4, "api.ir", null);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            logger.LogError(ex, "Bank validation provider call failed.");
-            return new(false, null, null, null, "provider",
-                "Bank validation service is unavailable.");
+            return Fail("api.ir", "Bank verification timed out.");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException)
+        {
+            logger.LogError(ex, "API.IR bank verification failed.");
+            return Fail("api.ir", "Bank verification service is unavailable.");
         }
     }
+
+    private async Task<T> PostAsync<T>(
+        HttpClient client,
+        string url,
+        object body,
+        CancellationToken ct)
+    {
+        using var response = await client.PostAsJsonAsync(url, body, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<T>(cancellationToken: ct)
+            ?? throw new JsonException("Empty API.IR response.");
+    }
+
+    private static BankValidationResult Fail(string provider, string error) =>
+        new(false, null, null, null, provider, error);
 
     private static string? NormalizeDigits(string? value)
     {
@@ -82,6 +136,14 @@ public sealed class BankValidationService(
         if (string.IsNullOrWhiteSpace(value)) return null;
         var result = value.Replace(" ", "").Trim().ToUpperInvariant();
         return result.StartsWith("IR", StringComparison.Ordinal) ? result : null;
+    }
+
+    private static string? NormalizeBirthDate(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var result = value.Trim().Replace("-", "/");
+        var parts = result.Split('/');
+        return parts.Length == 3 && parts.All(p => p.All(char.IsDigit)) ? result : null;
     }
 
     private static bool IsValidCard(string card)
@@ -113,13 +175,18 @@ public sealed class BankValidationService(
         return remainder == 1;
     }
 
-    private sealed record ProviderResponse(
-        [property: JsonPropertyName("status")] string? Status,
+    private sealed record ProviderEnvelope<T>(
+        [property: JsonPropertyName("success")] bool Success,
         [property: JsonPropertyName("message")] string? Message,
-        [property: JsonPropertyName("data")] ProviderData? Data);
+        [property: JsonPropertyName("data")] T? Data);
 
-    private sealed record ProviderData(
-        [property: JsonPropertyName("bank_name")] string? BankName,
+    private sealed record CardInfo(
+        [property: JsonPropertyName("name")] string? Name,
         [property: JsonPropertyName("iban")] string? Iban,
-        [property: JsonPropertyName("card_number")] string? CardNumber);
+        [property: JsonPropertyName("bankName")] string? BankName);
+
+    private sealed record IbanInfo(
+        [property: JsonPropertyName("name")] string? Name,
+        [property: JsonPropertyName("bankName")] string? BankName,
+        [property: JsonPropertyName("active")] bool Active);
 }
