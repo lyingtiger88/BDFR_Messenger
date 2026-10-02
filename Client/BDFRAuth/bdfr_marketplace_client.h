@@ -8,6 +8,8 @@
 #include <QtCore/QUuid>
 #include <QtNetwork/QNetworkAccessManager>
 
+class QNetworkReply;
+
 namespace BDFR {
 
 enum class StoreKind {
