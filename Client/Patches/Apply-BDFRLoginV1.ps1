@@ -10,7 +10,7 @@ function Backup-Once([string]$path) {
     $bak = "$path.bdfr-v1.bak"
     if (-not (Test-Path $bak)) { Copy-Item $path $bak }
 }
-function Save-Text([string]$path, [string]$text) { Set-Content -Path $path -Value $text -Encoding utf8NoBOM }
+function Save-Text([string]$path, [string]$text) { Set-Content -Path $path -Value $text -Encoding UTF8 }
 $nl = [Environment]::NewLine
 
 $rootCmake = Join-Path $root "CMakeLists.txt"
