@@ -45,9 +45,9 @@ Save-Text $telegramCmake $telegramText
 $bdfrH = @'
 #pragma once
 #include "intro/intro_step.h"
+#include "bdfr_auth_client.h"
 #include <memory>
 namespace Ui { class InputField; class PasswordInput; }
-namespace BDFR { class AuthClient; struct AuthSession; struct AuthError; }
 namespace Intro {
 namespace details {
 class BDFRWidget final : public Step {
@@ -76,7 +76,7 @@ private:
 
 $bdfrCpp = @'
 #include "intro/intro_bdfr.h"
-#include "bdfr_auth_client.h"
+#include <utility>
 #include "styles/style_intro.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/fields/password_input.h"
