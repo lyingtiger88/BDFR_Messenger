@@ -15,7 +15,7 @@ target_include_directories(bdfr_auth PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 
 set_target_properties(bdfr_auth PROPERTIES
-    CXX_STANDARD 17
+    CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )
