@@ -3,6 +3,8 @@ add_library(bdfr_auth STATIC
     bdfr_auth_client.h
     bdfr_marketplace_client.cpp
     bdfr_marketplace_client.h
+    bdfr_messaging_client.cpp
+    bdfr_messaging_client.h
 )
 
 target_link_libraries(bdfr_auth
