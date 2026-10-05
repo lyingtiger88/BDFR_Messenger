@@ -1,6 +1,7 @@
 #include "bdfr_messaging_client.h"
 
 #include <algorithm>
+#include <optional>
 #include <utility>
 
 #include <QtCore/QJsonArray>
