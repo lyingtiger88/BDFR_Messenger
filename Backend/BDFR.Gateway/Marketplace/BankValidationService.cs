@@ -160,7 +160,7 @@ public sealed class BankValidationService(
         return normalized.All(char.IsDigit) && normalized.Length > 0 ? normalized : null;
     }
 
-    private static string NormalizeDigit(char c) => c switch
+    private static char NormalizeDigit(char c) => c switch
     {
         >= '0' and <= '9' => c,
         >= '\u0660' and <= '\u0669' => (char)('0' + c - '\u0660'),
