@@ -80,5 +80,21 @@ $headers = @{ Authorization = "Bearer $($bob.accessToken)" }
 $conversation = Invoke-RestMethod -Method Get -Uri "$base/api/messages/with/$($alice.userId)" -Headers $headers
 $conversation | ConvertTo-Json
 
+$received = @($conversation) | Where-Object { $_.id -eq $message.id } | Select-Object -First 1
+if (-not $received) {
+    throw "Sent message was not returned in Bob's conversation."
+}
+
+Write-Host "Marking message as read..."
+Invoke-RestMethod -Method Post -Uri "$base/api/messages/$($message.id)/read" -Headers $headers -ContentType "application/json" -Body "{}" | Out-Null
+
+Write-Host "Verifying read receipt..."
+$conversationAfterRead = Invoke-RestMethod -Method Get -Uri "$base/api/messages/with/$($alice.userId)" -Headers $headers
+$readBack = @($conversationAfterRead) | Where-Object { $_.id -eq $message.id } | Select-Object -First 1
+if (-not $readBack -or -not $readBack.readAt) {
+    throw "Read receipt was not persisted for message $($message.id)."
+}
+$readBack | ConvertTo-Json
+
 Write-Host ""
-Write-Host "BDFR Messenger backend MVP test completed successfully."
+Write-Host "BDFR Messenger backend MVP + read receipt test completed successfully."
